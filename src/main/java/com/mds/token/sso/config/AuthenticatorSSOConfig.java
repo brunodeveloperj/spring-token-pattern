@@ -143,7 +143,11 @@ public final class AuthenticatorSSOConfig {
    * Get instance value of AuthenticatorManagerConfig singleton class.
    *
    * @return instance singleton class.
+   * @deprecated consumers must depend on the injected
+   * {@link com.mds.token.sso.SsoSessionProvider} instead of reaching this
+   * global accessor.
    */
+  @Deprecated
   public static AuthenticatorSSOConfig getInstance() throws GeneralException {
     AuthenticatorSSOConfig config = instance;
     if (config != null) {

@@ -177,3 +177,16 @@ Por padrão (`matchIfMissing = true`), a lib é ativada automaticamente.
 - Cache distribuído de tokens entre instâncias
 - Suporte multi-tenant (múltiplos realms)
 - Métricas Micrometer para latência de token requests
+
+## SsoSessionProvider: injected session access
+
+`com.mds.token.sso.SsoSessionProvider` is the contract for reading the
+current SSO session (`hasSession()`, `getAuthorization()`,
+`getEncryptedObject()`). `AuthenticationSSOHandler` implements it, so any
+component can inject the provider instead of calling
+`AuthenticatorSSOConfig.getInstance()` — which is now `@Deprecated`.
+
+This keeps adapters and services testable (mock the interface) and free of
+hidden global state. `AuthenticationManagerServiceImpl` and the Jackson
+`DLCrypto*` codecs already consume the provider internally; the singleton
+lifecycle (build/refresh) is preserved behind it.

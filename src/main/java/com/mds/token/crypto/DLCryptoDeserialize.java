@@ -8,7 +8,7 @@ import tools.jackson.core.JsonParser;
 import tools.jackson.databind.DeserializationContext;
 import tools.jackson.databind.ValueDeserializer;
 import com.mds.crypto.v1.session.DLCryptoSession;
-import com.mds.token.sso.config.AuthenticatorSSOConfig;
+import com.mds.token.sso.SsoSessionProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +35,7 @@ public class DLCryptoDeserialize extends ValueDeserializer<String> {
   private static final Logger logger = LoggerFactory.getLogger(DLCryptoDeserialize.class);
   @Value("${retry.limit:0}") private int maxRetry;
   @Lazy @Autowired private DLCryptoSession dlCryptoSession;
+  @Lazy @Autowired private SsoSessionProvider ssoSessionProvider;
 
   public DLCryptoDeserialize() {
     processInjectionBasedOnCurrentContext(this);
@@ -67,8 +68,8 @@ public class DLCryptoDeserialize extends ValueDeserializer<String> {
         String encryptedObject = null;
 
         // checks that the manager is not null.
-        if (AuthenticatorSSOConfig.isExistSingletonInstance()) {
-          encryptedObject = AuthenticatorSSOConfig.getInstance().getEncryptedObject();
+        if (ssoSessionProvider != null && ssoSessionProvider.hasSession()) {
+          encryptedObject = ssoSessionProvider.getEncryptedObject();
         }
 
         // checks that the encryptedObject is null and that the dlCryptoSession is not null.

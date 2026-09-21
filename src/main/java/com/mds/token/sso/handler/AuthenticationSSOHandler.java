@@ -2,6 +2,7 @@ package com.mds.token.sso.handler;
 
 import com.mds.crypto.v1.handler.EncryptedObjectHandler;
 import com.mds.token.config.AuthenticationPropertiesConfig;
+import com.mds.token.sso.SsoSessionProvider;
 import com.mds.token.sso.config.AuthenticatorSSOConfig;
 import com.mds.token.sso.feign.client.service.SSOService;
 import com.mds.error.handler.exception.GeneralException;
@@ -20,7 +21,7 @@ import org.springframework.stereotype.Component;
  * @since 0.0.1-SNAPSHOT
  */
 @Slf4j @Component
-public class AuthenticationSSOHandler {
+public class AuthenticationSSOHandler implements SsoSessionProvider {
 
   private final SSOService ssoService;
   private final AuthenticationPropertiesConfig authenticationPropertiesConfig;
@@ -61,6 +62,28 @@ public class AuthenticationSSOHandler {
    */
   public AuthenticatorSSOConfig getManager() throws GeneralException {
     return AuthenticatorSSOConfig.build(ssoService, encryptedObjectHandler);
+  }
+
+  @Override
+  public boolean hasSession() {
+    return AuthenticatorSSOConfig.isExistSingletonInstance();
+  }
+
+  @Override
+  public String getAuthorization() throws GeneralException {
+    final AuthenticatorSSOConfig config = getSession();
+    return config == null ? null : config.getAuthorization();
+  }
+
+  @Override
+  public String getEncryptedObject() throws GeneralException {
+    final AuthenticatorSSOConfig config = getSession();
+    return config == null ? null : config.getEncryptedObject();
+  }
+
+  private AuthenticatorSSOConfig getSession() throws GeneralException {
+    getManager();
+    return AuthenticatorSSOConfig.getInstance();
   }
 
 }

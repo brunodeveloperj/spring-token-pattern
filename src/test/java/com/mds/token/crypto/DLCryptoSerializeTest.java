@@ -12,7 +12,7 @@ import com.mds.crypto.v1.stub.DLCrypto;
 import tools.jackson.core.JsonGenerator;
 import tools.jackson.databind.SerializationContext;
 import com.mds.crypto.v1.session.DLCryptoSession;
-import com.mds.token.sso.config.AuthenticatorSSOConfig;
+import com.mds.token.sso.SsoSessionProvider;
 import java.lang.reflect.Field;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +25,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class DLCryptoSerializeTest {
 
   @Mock private DLCryptoSession dlCryptoSession;
+  @Mock private SsoSessionProvider ssoSessionProvider;
   @Mock private JsonGenerator jsonGenerator;
   @Mock private SerializationContext serializationContext;
 
@@ -33,9 +34,14 @@ class DLCryptoSerializeTest {
   @BeforeEach
   void setUp() throws Exception {
     serializer = new DLCryptoSerialize();
-    Field field = DLCryptoSerialize.class.getDeclaredField("dlCryptoSession");
+    setField(serializer, "dlCryptoSession", dlCryptoSession);
+    setField(serializer, "ssoSessionProvider", ssoSessionProvider);
+  }
+
+  private static void setField(Object target, String name, Object value) throws Exception {
+    Field field = DLCryptoSerialize.class.getDeclaredField(name);
     field.setAccessible(true);
-    field.set(serializer, dlCryptoSession);
+    field.set(target, value);
   }
 
   @Test
@@ -53,17 +59,14 @@ class DLCryptoSerializeTest {
   }
 
   @Test
-  void serialize_shouldEncryptValueUsingEncryptedObjectFromConfig() throws Exception {
-    AuthenticatorSSOConfig mockConfig = mock(AuthenticatorSSOConfig.class);
-    when(mockConfig.getEncryptedObject()).thenReturn("enc_obj");
+  void serialize_shouldEncryptValueUsingEncryptedObjectFromProvider() throws Exception {
+    when(ssoSessionProvider.hasSession()).thenReturn(true);
+    when(ssoSessionProvider.getEncryptedObject()).thenReturn("enc_obj");
 
     DLCrypto mockDlCrypto = mock(DLCrypto.class);
     when(mockDlCrypto.encrypt(anyString())).thenReturn("encrypted_result");
 
-    try (MockedStatic<AuthenticatorSSOConfig> mockedConfig = mockStatic(AuthenticatorSSOConfig.class);
-        MockedStatic<DLBCryptoLoader> mockedLoader = mockStatic(DLBCryptoLoader.class)) {
-      mockedConfig.when(AuthenticatorSSOConfig::isExistSingletonInstance).thenReturn(true);
-      mockedConfig.when(() -> AuthenticatorSSOConfig.getInstance()).thenReturn(mockConfig);
+    try (MockedStatic<DLBCryptoLoader> mockedLoader = mockStatic(DLBCryptoLoader.class)) {
       mockedLoader.when(() -> DLBCryptoLoader.deserialize(anyString())).thenReturn(mockDlCrypto);
 
       serializer.serialize("plain_value", jsonGenerator, serializationContext);
@@ -74,44 +77,35 @@ class DLCryptoSerializeTest {
   }
 
   @Test
-  void serialize_shouldEncryptValueUsingSessionWhenNoConfigInstance() throws Exception {
+  void serialize_shouldEncryptValueUsingSessionWhenNoProviderSession() throws Exception {
+    when(ssoSessionProvider.hasSession()).thenReturn(false);
+
     DLCrypto mockDlCrypto = mock(DLCrypto.class);
     when(dlCryptoSession.getSession()).thenReturn(mockDlCrypto);
     when(mockDlCrypto.encrypt(anyString())).thenReturn("encrypted_result");
 
-    try (MockedStatic<AuthenticatorSSOConfig> mockedConfig = mockStatic(AuthenticatorSSOConfig.class)) {
-      mockedConfig.when(AuthenticatorSSOConfig::isExistSingletonInstance).thenReturn(false);
+    serializer.serialize("plain_value", jsonGenerator, serializationContext);
 
-      serializer.serialize("plain_value", jsonGenerator, serializationContext);
-
-      verify(mockDlCrypto).setClient(true);
-      verify(jsonGenerator).writeString("encrypted_result");
-    }
+    verify(mockDlCrypto).setClient(true);
+    verify(jsonGenerator).writeString("encrypted_result");
   }
 
   @Test
   void serialize_shouldThrowIOExceptionWhenBothEncryptionSourcesAreNull() throws Exception {
-    Field field = DLCryptoSerialize.class.getDeclaredField("dlCryptoSession");
-    field.setAccessible(true);
-    field.set(serializer, null);
+    when(ssoSessionProvider.hasSession()).thenReturn(false);
+    setField(serializer, "dlCryptoSession", null);
 
-    try (MockedStatic<AuthenticatorSSOConfig> mockedConfig = mockStatic(AuthenticatorSSOConfig.class)) {
-      mockedConfig.when(AuthenticatorSSOConfig::isExistSingletonInstance).thenReturn(false);
-
-      assertThrows(RuntimeException.class, () -> serializer.serialize("plain_value", jsonGenerator, serializationContext));
-    }
+    assertThrows(RuntimeException.class, () -> serializer.serialize("plain_value", jsonGenerator, serializationContext));
   }
 
   @Test
   void serialize_shouldThrowRuntimeExceptionOnEncryptionException() throws Exception {
+    when(ssoSessionProvider.hasSession()).thenReturn(false);
+
     DLCrypto mockDlCrypto = mock(DLCrypto.class);
     when(dlCryptoSession.getSession()).thenReturn(mockDlCrypto);
     when(mockDlCrypto.encrypt(anyString())).thenThrow(new RuntimeException("Encryption failed"));
 
-    try (MockedStatic<AuthenticatorSSOConfig> mockedConfig = mockStatic(AuthenticatorSSOConfig.class)) {
-      mockedConfig.when(AuthenticatorSSOConfig::isExistSingletonInstance).thenReturn(false);
-
-      assertThrows(RuntimeException.class, () -> serializer.serialize("plain_value", jsonGenerator, serializationContext));
+    assertThrows(RuntimeException.class, () -> serializer.serialize("plain_value", jsonGenerator, serializationContext));
   }
-}
 }

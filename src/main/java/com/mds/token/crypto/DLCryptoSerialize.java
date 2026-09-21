@@ -8,10 +8,11 @@ import tools.jackson.core.JsonGenerator;
 import tools.jackson.databind.SerializationContext;
 import tools.jackson.databind.ValueSerializer;
 import com.mds.crypto.v1.session.DLCryptoSession;
-import com.mds.token.sso.config.AuthenticatorSSOConfig;
+import com.mds.token.sso.SsoSessionProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 
 /**
  * Custom Jackson {@link ValueSerializer} that transparently encrypts
@@ -32,6 +33,7 @@ public class DLCryptoSerialize extends ValueSerializer<String> {
 
   private static final Logger logger = LoggerFactory.getLogger(DLCryptoSerialize.class);
   @Autowired private DLCryptoSession dlCryptoSession;
+  @Autowired @Lazy private SsoSessionProvider ssoSessionProvider;
 
   public DLCryptoSerialize() {
     processInjectionBasedOnCurrentContext(this);
@@ -51,8 +53,8 @@ public class DLCryptoSerialize extends ValueSerializer<String> {
       String encryptedObject = null;
 
       // checks that the manager is not null.
-      if (AuthenticatorSSOConfig.isExistSingletonInstance()) {
-        encryptedObject = AuthenticatorSSOConfig.getInstance().getEncryptedObject();
+      if (ssoSessionProvider != null && ssoSessionProvider.hasSession()) {
+        encryptedObject = ssoSessionProvider.getEncryptedObject();
       }
 
       // checks that the encryptedObject is null and that the dlCryptoSession is not null.
